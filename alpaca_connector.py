@@ -23,6 +23,9 @@ HEADERS = {
 
 # Tradeable symbols — stocks, ETFs, crypto
 TRADEABLE_PAIRS = [
+    # Crypto (24/7)
+    "BTC/USD",  # Bitcoin
+    "ETH/USD",  # Ethereum
     # Gold & commodities (ETFs)
     "GLD",   # Gold ETF
     "SLV",   # Silver ETF
@@ -86,18 +89,18 @@ def get_candles(symbol, timeframe="1H", count=200):
 
     start_str = start.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    url = f"{DATA_BASE_URL}/v2/stocks/{symbol}/bars"
-    params = {
-        "timeframe": tf,
-        "start":     start_str,
-        "limit":     count,
-        "feed":      "iex",
-        "sort":      "asc"
-    }
+    is_crypto = "/" in symbol
+    if is_crypto:
+        url = f"{DATA_BASE_URL}/v1beta3/crypto/us/bars"
+        params = {"symbols": symbol, "timeframe": tf, "start": start_str, "limit": count, "sort": "asc"}
+    else:
+        url = f"{DATA_BASE_URL}/v2/stocks/{symbol}/bars"
+        params = {"timeframe": tf, "start": start_str, "limit": count, "feed": "iex", "sort": "asc"}
 
     r = requests.get(url, headers=HEADERS, params=params, timeout=15)
     r.raise_for_status()
-    bars = r.json().get("bars", [])
+    raw = r.json()
+    bars = raw["bars"][symbol] if is_crypto else raw.get("bars", [])
 
     if not bars:
         return pd.DataFrame()
