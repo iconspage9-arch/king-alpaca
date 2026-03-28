@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: kingscalp-trading-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: ALPACA_API_KEY
+        sync: false          # Your Alpaca Key ID
+      - key: ALPACA_SECRET_KEY
+        sync: false          # Your Alpaca Secret Key
+      - key: ALPACA_BASE_URL
+        value: "https://paper-api.alpaca.markets"   # Change to https://api.alpaca.markets for live
+      - key: GEMINI_API_KEY
+        sync: false          # Your Gemini API key
+      - key: STARTING_BALANCE
+        value: "5000"
+      - key: PROFIT_TARGET
+        value: "500"
+      - key: MAX_TOTAL_DRAWDOWN
+        value: "500"
+      - key: MAX_DAILY_LOSS
+        value: "250"
+      - key: RISK_PER_TRADE_PCT
+        value: "1.0"
+      - key: CHECK_INTERVAL_SECONDS
+        value: "900"
+      - key: GEMINI_MODEL
+        value: "gemini-2.0-flash"
