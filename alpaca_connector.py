@@ -5,10 +5,13 @@ Supports multi-symbol scanning
 """
 
 import os
+import warnings
 import requests
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone, timedelta
+
+warnings.filterwarnings("ignore")
 
 ALPACA_API_KEY    = os.environ.get("ALPACA_API_KEY", "")
 ALPACA_SECRET_KEY = os.environ.get("ALPACA_SECRET_KEY", "")
@@ -216,7 +219,8 @@ def get_market_summary(symbol):
                 "swing_highs":         [round(x, 5) for x in swing_highs],
                 "swing_lows":          [round(x, 5) for x in swing_lows],
             }
-        except Exception:
+        except Exception as e:
+            print(f"{symbol} {tf} error: {e}", flush=True)
             return None
 
     return summary
