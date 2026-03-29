@@ -107,7 +107,7 @@ def get_candles(symbol, timeframe="1H", count=200):
 
 def calculate_indicators(df):
     """Add EMA20, EMA50, EMA200, RSI14, ATR14, MACD, BB, StochRSI to dataframe"""
-    if len(df) < 50:
+    if len(df) < 20:
         return df
 
     # EMAs
@@ -151,8 +151,8 @@ def calculate_indicators(df):
     df["stoch_rsi"] = (df["rsi"] - rsi_min) / (rsi_max - rsi_min + 1e-10) * 100
 
     # Swing highs / lows
-    df["swing_high"] = df["high"].rolling(5, center=True).max() == df["high"]
-    df["swing_low"]  = df["low"].rolling(5,  center=True).min() == df["low"]
+    df["swing_high"] = df["high"].rolling(3, center=True).max() == df["high"]
+    df["swing_low"]  = df["low"].rolling(3,  center=True).min() == df["low"]
 
     # Trend
     df["trend"] = df["ema20"] > df["ema50"]
