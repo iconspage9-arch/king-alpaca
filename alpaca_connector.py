@@ -1,7 +1,6 @@
 """
 Alpaca Connector — handles all communication with Alpaca Markets API
 Pulls bar data, calculates indicators, places and manages trades
-Supports multi-symbol scanning
 """
 
 import os
@@ -24,7 +23,6 @@ HEADERS = {
     "Content-Type":        "application/json"
 }
 
-# Tradeable symbols — crypto only for now
 TRADEABLE_PAIRS = [
     "BTC/USD",
 ]
@@ -35,10 +33,6 @@ TIMEFRAME_MAP = {
     "4H":  "4Hour",
 }
 
-
-# ─────────────────────────────────────────────
-# ACCOUNT
-# ─────────────────────────────────────────────
 
 def get_account_info():
     url = f"{ALPACA_BASE_URL}/v2/account"
@@ -53,14 +47,9 @@ def get_account_info():
     }
 
 
-# ─────────────────────────────────────────────
-# MARKET DATA + INDICATORS
-# ─────────────────────────────────────────────
-
 def get_candles(symbol, timeframe="1H", count=200):
     tf = TIMEFRAME_MAP.get(timeframe, "1Hour")
 
-    # Calculate start time based on count and timeframe
     now = datetime.now(timezone.utc)
     if timeframe == "15M":
         start = now - timedelta(days=30)
@@ -106,16 +95,13 @@ def get_candles(symbol, timeframe="1H", count=200):
 
 
 def calculate_indicators(df):
-    """Add EMA20, EMA50, EMA200, RSI14, ATR14, MACD, BB, StochRSI to dataframe"""
     if len(df) < 20:
         return df
 
-    # EMAs
     df["ema20"]  = df["close"].ewm(span=20,  adjust=False).mean()
     df["ema50"]  = df["close"].ewm(span=50,  adjust=False).mean()
     df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
 
-    # RSI 14
     delta    = df["close"].diff()
     gain     = delta.clip(lower=0)
     loss     = -delta.clip(upper=0)
@@ -124,44 +110,36 @@ def calculate_indicators(df):
     rs       = avg_gain / avg_loss.replace(0, np.nan)
     df["rsi"] = 100 - (100 / (1 + rs))
 
-    # ATR 14
     high_low   = df["high"] - df["low"]
     high_close = (df["high"] - df["close"].shift()).abs()
     low_close  = (df["low"]  - df["close"].shift()).abs()
     true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
     df["atr"]  = true_range.ewm(com=13, adjust=False).mean()
 
-    # MACD (12, 26, 9)
     ema12        = df["close"].ewm(span=12, adjust=False).mean()
     ema26        = df["close"].ewm(span=26, adjust=False).mean()
     df["macd"]   = ema12 - ema26
     df["signal"] = df["macd"].ewm(span=9, adjust=False).mean()
     df["hist"]   = df["macd"] - df["signal"]
 
-    # Bollinger Bands (20, 2)
     rolling_mean   = df["close"].rolling(20).mean()
     rolling_std    = df["close"].rolling(20).std()
     df["bb_upper"] = rolling_mean + (2 * rolling_std)
     df["bb_lower"] = rolling_mean - (2 * rolling_std)
     df["bb_mid"]   = rolling_mean
 
-    # Stochastic RSI
-    rsi_min        = df["rsi"].rolling(14).min()
-    rsi_max        = df["rsi"].rolling(14).max()
+    rsi_min         = df["rsi"].rolling(14).min()
+    rsi_max         = df["rsi"].rolling(14).max()
     df["stoch_rsi"] = (df["rsi"] - rsi_min) / (rsi_max - rsi_min + 1e-10) * 100
 
-    # Swing highs / lows
     df["swing_high"] = df["high"].rolling(3, center=True).max() == df["high"]
     df["swing_low"]  = df["low"].rolling(3,  center=True).min() == df["low"]
-
-    # Trend
-    df["trend"] = df["ema20"] > df["ema50"]
+    df["trend"]      = df["ema20"] > df["ema50"]
 
     return df
 
 
 def get_market_summary(symbol):
-    """Pull multi-timeframe data + indicators for Gemini to analyze"""
     summary = {}
     for tf in ["4H", "1H", "15M"]:
         try:
@@ -208,24 +186,19 @@ def get_market_summary(symbol):
     return summary
 
 
-# ─────────────────────────────────────────────
-# OPEN POSITIONS
-# ─────────────────────────────────────────────
-
 def get_open_trades(symbol=None):
     url = f"{ALPACA_BASE_URL}/v2/positions"
     r   = requests.get(url, headers=HEADERS, timeout=15)
     r.raise_for_status()
     positions = r.json()
 
-    # Normalize to same shape main.py expects
     trades = []
     for p in positions:
         trades.append({
-            "instrument":    p["symbol"],
-            "currentUnits":  p["qty"],
-            "unrealizedPL":  float(p.get("unrealized_pl", 0)),
-            "id":            p["asset_id"],
+            "instrument":   p["symbol"],
+            "currentUnits": p["qty"],
+            "unrealizedPL": float(p.get("unrealized_pl", 0)),
+            "id":           p["asset_id"],
         })
 
     if symbol:
@@ -234,7 +207,6 @@ def get_open_trades(symbol=None):
 
 
 def get_closed_trades_today():
-    """Get trades closed today for P&L tracking"""
     from datetime import date
     today_str = date.today().isoformat() + "T00:00:00Z"
 
@@ -244,7 +216,6 @@ def get_closed_trades_today():
     r.raise_for_status()
     activities = r.json()
 
-    # Normalize to match risk_manager expectations
     trades = []
     for a in activities:
         if a.get("type") == "fill":
@@ -255,16 +226,7 @@ def get_closed_trades_today():
     return trades
 
 
-# ─────────────────────────────────────────────
-# PLACE ORDER
-# ─────────────────────────────────────────────
-
 def place_order(symbol, direction, units, sl_price, tp_price):
-    """
-    direction: 'buy' or 'sell'
-    units: number of shares/units
-    Uses bracket order for automatic SL and TP
-    """
     side = "buy" if direction == "buy" else "sell"
     qty  = abs(int(units))
 
@@ -276,7 +238,7 @@ def place_order(symbol, direction, units, sl_price, tp_price):
         "qty":           str(qty),
         "side":          side,
         "type":          "market",
-        "time_in_force": "day",
+        "time_in_force": "gtc",
         "order_class":   "bracket",
         "stop_loss": {
             "stop_price": str(round(sl_price, 2))
