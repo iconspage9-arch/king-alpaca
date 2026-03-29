@@ -24,28 +24,9 @@ HEADERS = {
     "Content-Type":        "application/json"
 }
 
-# Tradeable symbols — stocks, ETFs, crypto
+# Tradeable symbols — crypto only for now
 TRADEABLE_PAIRS = [
-    # Crypto (24/7)
-    "BTC/USD",  # Bitcoin
-    "ETH/USD",  # Ethereum
-    # Gold & commodities (ETFs)
-    "GLD",   # Gold ETF
-    "SLV",   # Silver ETF
-    "GDX",   # Gold miners ETF
-    # Major indices ETFs
-    "SPY",   # S&P 500
-    "QQQ",   # NASDAQ 100
-    "DIA",   # Dow Jones
-    "IWM",   # Russell 2000
-    # High-liquidity stocks
-    "AAPL",  # Apple
-    "MSFT",  # Microsoft
-    "NVDA",  # NVIDIA
-    "TSLA",  # Tesla
-    "AMZN",  # Amazon
-    "META",  # Meta
-    "GOOGL", # Alphabet
+    "BTC/USD",
 ]
 
 TIMEFRAME_MAP = {
