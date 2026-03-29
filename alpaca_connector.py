@@ -82,13 +82,13 @@ def get_candles(symbol, timeframe="1H", count=200):
     # Calculate start time based on count and timeframe
     now = datetime.now(timezone.utc)
     if timeframe == "15M":
-        start = now - timedelta(minutes=15 * count)
+        start = now - timedelta(days=30)
     elif timeframe == "1H":
-        start = now - timedelta(hours=count)
+        start = now - timedelta(days=30)
     elif timeframe == "4H":
-        start = now - timedelta(hours=4 * count)
+        start = now - timedelta(days=60)
     else:
-        start = now - timedelta(hours=count)
+        start = now - timedelta(days=30)
 
     start_str = start.strftime("%Y-%m-%dT%H:%M:%SZ")
 
