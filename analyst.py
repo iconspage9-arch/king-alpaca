@@ -1,21 +1,20 @@
 """
-Gemini Analyst — sends market data to Gemini 2.0 Flash and gets trade decisions.
-Supports scanning multiple pairs and returning the best setup.
-Free via Google AI Studio API key.
+Groq Analyst — sends market data to Groq (Llama 3.3 70B) and gets trade decisions.
+Free tier: 30 requests/min, 14,400/day — more than enough for this bot.
 """
 
 import os
 import json
 import requests
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-MODEL          = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
-GEMINI_URL     = (
-    f"https://generativelanguage.googleapis.com/v1beta/models/"
-    f"{MODEL}:generateContent?key={GEMINI_API_KEY}"
-)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
+MODEL        = "llama-3.3-70b-versatile"
 
-HEADERS = {"Content-Type": "application/json"}
+HEADERS = {
+    "Authorization": f"Bearer {GROQ_API_KEY}",
+    "Content-Type":  "application/json"
+}
 
 SYSTEM_PROMPT = """You are an elite institutional trader managing a $5,000 funded trading challenge account.
 
@@ -76,12 +75,11 @@ JSON format:
   "rr_ratio": float or null,
   "timeframe_used": "15M" | "1H" | "4H",
   "pattern": "describe the pattern/setup (e.g. BOS retest, BB squeeze, MACD crossover)"
-}
-"""
+}"""
 
 
 def analyze_market(symbol: str, market_summary: dict, account_info: dict, open_trades: list) -> dict:
-    """Send market data to Gemini and get trade decision for one pair"""
+    """Send market data to Groq and get trade decision"""
 
     user_message = f"""
 Analyze this pair: {symbol}
@@ -108,26 +106,22 @@ Respond in JSON only. No markdown, no extra text.
 """
 
     payload = {
-        "system_instruction": {
-            "parts": [{"text": SYSTEM_PROMPT}]
-        },
-        "contents": [
-            {"role": "user", "parts": [{"text": user_message}]}
-        ],
-        "generationConfig": {
-            "temperature":      0.1,   # Low temp = more consistent, rule-following
-            "maxOutputTokens":  1000,
-            "responseMimeType": "application/json"  # Forces clean JSON output
-        }
+        "model":       MODEL,
+        "temperature": 0.1,
+        "max_tokens":  1000,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user",   "content": user_message}
+        ]
     }
 
     try:
-        r = requests.post(GEMINI_URL, headers=HEADERS, json=payload, timeout=30)
+        r = requests.post(GROQ_URL, headers=HEADERS, json=payload, timeout=30)
         r.raise_for_status()
 
-        content = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        content = r.json()["choices"][0]["message"]["content"].strip()
 
-        # Strip markdown fences if present (belt and braces)
+        # Strip markdown fences if present
         if content.startswith("```"):
             parts = content.split("```")
             content = parts[1] if len(parts) > 1 else parts[0]
@@ -140,7 +134,6 @@ Respond in JSON only. No markdown, no extra text.
         return decision
 
     except Exception as e:
-        # Safe fallback — never crash the whole cycle
         return {
             "symbol":         symbol,
             "decision":       "NO_TRADE",
@@ -156,11 +149,7 @@ Respond in JSON only. No markdown, no extra text.
 
 
 def pick_best_setup(decisions: list) -> dict:
-    """
-    From a list of decisions across multiple pairs,
-    return the single best tradeable setup (highest confidence BUY/SELL).
-    Falls back to NO_TRADE if nothing qualifies.
-    """
+    """Pick the best tradeable setup from all decisions"""
     tradeable = [
         d for d in decisions
         if d.get("decision") in ("BUY", "SELL")
@@ -173,18 +162,16 @@ def pick_best_setup(decisions: list) -> dict:
 
     if not tradeable:
         return {
-            "symbol":    None,
-            "decision":  "NO_TRADE",
-            "confidence": 0,
-            "reasoning": "No qualifying setup found across all pairs this cycle.",
-            "entry_price": None,
-            "sl_price":    None,
-            "tp_price":    None,
-            "rr_ratio":    None,
+            "symbol":         None,
+            "decision":       "NO_TRADE",
+            "confidence":     0,
+            "reasoning":      "No qualifying setup found across all pairs this cycle.",
+            "entry_price":    None,
+            "sl_price":       None,
+            "tp_price":       None,
+            "rr_ratio":       None,
             "timeframe_used": None,
-            "pattern": None,
+            "pattern":        None,
         }
 
-    # Pick highest confidence; break ties by best RR ratio
-    best = max(tradeable, key=lambda d: (d["confidence"], d.get("rr_ratio", 0)))
-    return best
+    return max(tradeable, key=lambda d: (d["confidence"], d.get("rr_ratio", 0)))
