@@ -76,7 +76,7 @@ def get_candles(symbol, timeframe="1H", count=200):
     is_crypto = "/" in symbol
     if is_crypto:
         url = f"{DATA_BASE_URL}/v1beta3/crypto/us/bars"
-        params = {"symbols": symbol, "timeframe": tf, "start": start_str, "limit": count, "sort": "asc"}
+        params = {"symbols": symbol, "timeframe": tf, "start": start_str, "sort": "asc"}
     else:
         url = f"{DATA_BASE_URL}/v2/stocks/{symbol}/bars"
         params = {"timeframe": tf, "start": start_str, "limit": count, "feed": "iex", "sort": "asc"}
@@ -166,7 +166,8 @@ def get_market_summary(symbol):
     for tf in ["4H", "1H", "15M"]:
         try:
             df = get_candles(symbol, tf, 200)
-            if df.empty or len(df) < 52:
+            if df.empty or len(df) < 10:
+                print(f"{symbol} {tf}: got {len(df)} candles", flush=True)
                 return None
             df = calculate_indicators(df)
             last = df.iloc[-1]
