@@ -113,27 +113,28 @@ def get_risk_dollar(balance: float) -> float:
     return round(balance * RISK_PER_TRADE / 100, 2)
 
 
-def calculate_units(balance: float, sl_distance_price: float, price: float, instrument: str = "SPY") -> int:
+def calculate_units(balance: float, sl_distance_price: float, price: float, instrument: str = "SPY") -> float:
     """
-    Calculate shares to trade based on 1% risk.
-    units = risk_$ / sl_distance_per_share
+    Calculate position size based on 1% risk.
+    For crypto: returns fractional qty based on USD risk / SL distance per unit.
+    Ensures total position value does not exceed available balance.
     """
     risk_dollar = get_risk_dollar(balance)
 
-    if sl_distance_price <= 0:
-        return 1
+    if sl_distance_price <= 0 or price <= 0:
+        return 0.01
 
-    units = int(risk_dollar / sl_distance_price)
+    qty = round(risk_dollar / sl_distance_price, 4)
 
-    # Caps by instrument type
-    if instrument in ("GLD", "SLV", "GDX"):
-        units = max(1, min(units, 500))    # ETFs
-    elif instrument in ("SPY", "QQQ", "DIA", "IWM"):
-        units = max(1, min(units, 100))    # Index ETFs
-    else:
-        units = max(1, min(units, 200))    # Stocks
+    # Make sure total position value does not exceed 95% of balance
+    max_qty = round((balance * 0.95) / price, 4)
+    qty = min(qty, max_qty)
 
-    return units
+    # Minimum order size
+    if qty <= 0:
+        qty = 0.01
+
+    return qty
 
 
 def get_status(current_balance: float, closed_trades: list = None) -> dict:
