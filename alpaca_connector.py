@@ -140,7 +140,15 @@ def calculate_indicators(df):
 
 
 def get_market_summary(symbol):
-    summary = {}
+    # Fetch live price first — this is what the LLM must use as entry price
+    try:
+        live_price = get_live_price(symbol)
+    except Exception as e:
+        print(f"{symbol}: could not fetch live price: {e}", flush=True)
+        return None
+
+    summary = {"live_price": round(live_price, 5)}
+
     for tf in ["4H", "1H", "15M"]:
         try:
             df = get_candles(symbol, tf, 200)
