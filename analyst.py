@@ -84,6 +84,9 @@ def analyze_market(symbol: str, market_summary: dict, account_info: dict, open_t
     user_message = f"""
 Analyze this pair: {symbol}
 
+IMPORTANT: Use the "live_price" field as your entry price — this is the real-time market price.
+Do NOT use candle close prices as entry. SL and TP must be calculated from live_price.
+
 Multi-timeframe market data:
 {json.dumps(market_summary, indent=2)}
 
