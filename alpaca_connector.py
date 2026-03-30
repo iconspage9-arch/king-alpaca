@@ -334,16 +334,17 @@ def place_order(symbol, direction, units, sl_price, tp_price):
         }
     # -------------------------------------------------------
 
-    # Alpaca does NOT support bracket orders for crypto — place legs separately.
+    # Alpaca crypto: use notional (USD amount) for market orders, qty for limit/stop exits
     url = f"{ALPACA_BASE_URL}/v2/orders"
+    notional = round(qty * live_price, 2)  # USD value of position
 
-    # 1) Main market order
+    # 1) Main market order using notional USD
     main_order = {
         "symbol":        symbol,
-        "qty":           str(qty),
+        "notional":      str(notional),
         "side":          side,
         "type":          "market",
-        "time_in_force": "gtc",
+        "time_in_force": "ioc",  # immediate or cancel for market orders
     }
     r = requests.post(url, headers=HEADERS, json=main_order, timeout=15)
     if r.status_code not in [200, 201]:
@@ -351,12 +352,13 @@ def place_order(symbol, direction, units, sl_price, tp_price):
 
     data     = r.json()
     trade_id = data.get("id")
+    filled_qty = float(data.get("filled_qty") or qty)
 
     # 2) Take-profit limit order (opposite side, reduce-only)
     exit_side = "sell" if side == "buy" else "buy"
     tp_order = {
         "symbol":        symbol,
-        "qty":           str(qty),
+        "qty":           str(round(filled_qty, 4)),
         "side":          exit_side,
         "type":          "limit",
         "time_in_force": "gtc",
@@ -370,7 +372,7 @@ def place_order(symbol, direction, units, sl_price, tp_price):
     # 3) Stop-loss stop order (opposite side, reduce-only)
     sl_order = {
         "symbol":        symbol,
-        "qty":           str(qty),
+        "qty":           str(round(filled_qty, 4)),
         "side":          exit_side,
         "type":          "stop",
         "time_in_force": "gtc",
