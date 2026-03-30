@@ -25,6 +25,10 @@ HEADERS = {
 
 TRADEABLE_PAIRS = [
     "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "LINK/USD",
+    "AVAX/USD",
 ]
 
 TIMEFRAME_MAP = {
