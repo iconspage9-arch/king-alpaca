@@ -226,12 +226,96 @@ def get_closed_trades_today():
     return trades
 
 
+def get_live_price(symbol):
+    """Fetch the latest trade price for a symbol."""
+    is_crypto = "/" in symbol
+    if is_crypto:
+        url = f"{DATA_BASE_URL}/v1beta3/crypto/us/latest/trades"
+        params = {"symbols": symbol}
+        r = requests.get(url, headers=HEADERS, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        return float(data["trades"][symbol]["p"])
+    else:
+        url = f"{DATA_BASE_URL}/v2/stocks/{symbol}/trades/latest"
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        r.raise_for_status()
+        return float(r.json()["trade"]["p"])
+
+
 def place_order(symbol, direction, units, sl_price, tp_price):
     side = "buy" if direction == "buy" else "sell"
     qty  = abs(int(units))
 
     if qty < 1:
         qty = 1
+
+    # --- Fetch live price and validate TP before placing ---
+    try:
+        live_price = get_live_price(symbol)
+    except Exception as e:
+        return {"success": False, "error": f"Could not fetch live price: {e}"}
+
+    if side == "sell":
+        # For SELL: TP must be below live price (we're targeting a drop)
+        if tp_price >= live_price:
+            return {
+                "success": False,
+                "error": (
+                    f"TP {tp_price} is at or above live price {live_price} for a SELL — "
+                    f"market has already moved past target. Skipping stale signal."
+                )
+            }
+        # Also validate SL is above live price
+        if sl_price <= live_price:
+            return {
+                "success": False,
+                "error": (
+                    f"SL {sl_price} is at or below live price {live_price} for a SELL — "
+                    f"invalid structure. Skipping."
+                )
+            }
+    else:  # buy
+        # For BUY: TP must be above live price
+        if tp_price <= live_price:
+            return {
+                "success": False,
+                "error": (
+                    f"TP {tp_price} is at or below live price {live_price} for a BUY — "
+                    f"market has already moved past target. Skipping stale signal."
+                )
+            }
+        # Also validate SL is below live price
+        if sl_price >= live_price:
+            return {
+                "success": False,
+                "error": (
+                    f"SL {sl_price} is at or above live price {live_price} for a BUY — "
+                    f"invalid structure. Skipping."
+                )
+            }
+
+    # Re-check RR ratio using live price (not stale entry price from LLM)
+    if side == "sell":
+        live_sl_dist = abs(sl_price - live_price)
+        live_tp_dist = abs(live_price - tp_price)
+    else:
+        live_sl_dist = abs(live_price - sl_price)
+        live_tp_dist = abs(tp_price - live_price)
+
+    if live_sl_dist == 0:
+        return {"success": False, "error": "SL distance is zero — cannot place order."}
+
+    live_rr = live_tp_dist / live_sl_dist
+    if live_rr < 2.0:
+        return {
+            "success": False,
+            "error": (
+                f"Live RR is {live_rr:.2f} (live price: {live_price}) — "
+                f"below 2.0 minimum after price movement. Skipping."
+            )
+        }
+    # -------------------------------------------------------
 
     order_body = {
         "symbol":        symbol,
@@ -263,4 +347,5 @@ def place_order(symbol, direction, units, sl_price, tp_price):
         "direction": direction,
         "sl":        sl_price,
         "tp":        tp_price,
+        "live_rr":   round(live_rr, 2),
     }
