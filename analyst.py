@@ -45,7 +45,7 @@ ENTRY TRIGGER (15M):
 - Bollinger Band squeeze breakout adds extra confidence
 - Price must be near value area (near EMA20 on 1H), not extended
 
-CONFLUENCE SCORING (must be 7/10 or higher to trade):
+CONFLUENCE SCORING (must be 6/10 or higher to trade):
 - 4H trend aligned: +2
 - 1H structure break confirmed: +2
 - 15M entry trigger (MACD + RSI): +2
@@ -76,7 +76,7 @@ JSON format:
   "sl_price": float or null,
   "tp_price": float or null,
   "rr_ratio": float or null,
-  "timeframe_used": "15M" | "1H" | "4H",
+  "timeframe_used": "15M" | "1H" | "4H",  // use 1H if no 15M trigger but setup is strong
   "pattern": "describe the pattern/setup (e.g. BOS retest, BB squeeze, MACD crossover)"
 }"""
 
@@ -111,7 +111,7 @@ Risk status:
 
 Analyze top-down: 4H bias → 1H structure → 15M entry.
 Score the setup out of 10 using the confluence scoring system.
-Only recommend BUY or SELL if confidence is 7 or higher AND all three timeframes agree.
+Only recommend BUY or SELL if confidence is 6 or higher AND the 4H and 1H timeframes agree. 15M entry trigger is preferred but not required if 4H and 1H are very strong.
 Respond in JSON only. No markdown, no extra text.
 """
 
@@ -170,7 +170,7 @@ def pick_best_setup(decisions: list) -> dict:
     tradeable = [
         d for d in decisions
         if d.get("decision") in ("BUY", "SELL")
-        and d.get("confidence", 0) >= 7
+        and d.get("confidence", 0) >= 6
         and d.get("sl_price") is not None
         and d.get("tp_price") is not None
         and d.get("rr_ratio") is not None
