@@ -55,9 +55,12 @@ CONFLUENCE SCORING (must be 7/10 or higher to trade):
 - No major news or weekend risk: +1
 
 RISK RULES:
-- SL must be structural (behind swing high/low), NOT arbitrary
-- TP must give at least 1:2 RR
-- Validate SL distance is 1-2x ATR on entry timeframe
+- entry_price MUST equal the live_price field exactly — do not use candle close
+- SL must be 1.0x to 1.5x the 15M ATR away from live_price, placed behind the nearest structural level
+- If the nearest swing high/low is more than 2x ATR away from live_price, use 1.5x ATR as SL instead — do NOT anchor SL to distant old levels
+- TP must give at least 1:2 RR based on the SL distance from live_price
+- Always verify: (|live_price - tp_price|) / (|live_price - sl_price|) >= 2.0 before responding
+- If RR cannot reach 2.0 with a sensible SL: NO_TRADE
 - If market is ranging or unclear: NO_TRADE — capital protection is priority
 - If daily or total loss limits are near: be more conservative
 
@@ -84,8 +87,12 @@ def analyze_market(symbol: str, market_summary: dict, account_info: dict, open_t
     user_message = f"""
 Analyze this pair: {symbol}
 
-IMPORTANT: Use the "live_price" field as your entry price — this is the real-time market price.
-Do NOT use candle close prices as entry. SL and TP must be calculated from live_price.
+CRITICAL PRICE RULES — follow exactly:
+1. entry_price = live_price (copy it exactly, do not round or adjust)
+2. SL = live_price +/- (1.0 to 1.5 x 15M ATR). For SELL: SL above live_price. For BUY: SL below live_price.
+3. TP = live_price -/+ (at least 2.0 x SL_distance). For SELL: TP below live_price. For BUY: TP above live_price.
+4. Double-check: abs(live_price - tp_price) / abs(live_price - sl_price) >= 2.0
+5. Do NOT use old swing highs/lows that are more than 1.5x ATR away as SL — they are too wide and will fail the RR check.
 
 Multi-timeframe market data:
 {json.dumps(market_summary, indent=2)}
