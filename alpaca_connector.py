@@ -257,10 +257,15 @@ def get_live_price(symbol):
 
 def place_order(symbol, direction, units, sl_price, tp_price):
     side = "buy" if direction == "buy" else "sell"
-    qty  = abs(int(units))
 
-    if qty < 1:
-        qty = 1
+    # For crypto, use fractional qty — do not cast to int
+    is_crypto = "/" in symbol
+    if is_crypto:
+        qty = round(abs(float(units)), 4)
+        if qty <= 0:
+            qty = 0.01
+    else:
+        qty = max(1, abs(int(units)))
 
     # --- Fetch live price and validate TP before placing ---
     try:
