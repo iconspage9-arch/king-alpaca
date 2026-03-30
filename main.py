@@ -27,7 +27,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL_SECONDS", 900))
+CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL_SECONDS", 300))
 
 
 def log_decision(decision: dict):
@@ -129,7 +129,7 @@ def run_cycle():
     symbol = best["symbol"]
 
     # 7. Final validation
-    if best["confidence"] < 7:
+    if best["confidence"] < 6:
         log.info(f"⚠️  Confidence too low ({best['confidence']}/10) — skipping")
         return
 
@@ -161,14 +161,15 @@ def run_cycle():
         return
 
     if result["success"]:
+        live_rr = result.get("live_rr", best["rr_ratio"])
         log.info(
             f"✅ Trade placed! | {symbol} {best['decision']} | "
             f"ID: {result['trade_id']} | Price: {result['price']} | "
             f"Units: {units} | SL: {best['sl_price']} | TP: {best['tp_price']} | "
-            f"RR: {best['rr_ratio']}"
+            f"Signal RR: {best['rr_ratio']} | Live RR: {live_rr}"
         )
     else:
-        log.error(f"❌ Order failed: {result['error']}")
+        log.warning(f"⚠️  Order skipped: {result['error']}")
 
 
 if __name__ == "__main__":
