@@ -88,11 +88,11 @@ def analyze_market(symbol: str, market_summary: dict, account_info: dict, open_t
 Analyze this pair: {symbol}
 
 CRITICAL PRICE RULES — follow exactly:
-1. entry_price = live_price (copy it exactly, do not round or adjust)
-2. SL = live_price +/- (1.0 to 1.5 x 15M ATR). For SELL: SL above live_price. For BUY: SL below live_price.
-3. TP = live_price -/+ (at least 2.0 x SL_distance). For SELL: TP below live_price. For BUY: TP above live_price.
-4. Double-check: abs(live_price - tp_price) / abs(live_price - sl_price) >= 2.0
-5. Do NOT use old swing highs/lows that are more than 1.5x ATR away as SL — they are too wide and will fail the RR check.
+1. entry_price must equal the live_price field exactly.
+2. For SELL: SL is live_price plus 1.0 to 1.5 times the 15M ATR. For BUY: SL is live_price minus 1.0 to 1.5 times the 15M ATR.
+3. For SELL: TP is live_price minus at least 2.0 times the SL distance. For BUY: TP is live_price plus at least 2.0 times the SL distance.
+4. Before responding, verify that the distance from live_price to tp_price divided by the distance from live_price to sl_price is at least 2.0. If not, output NO_TRADE.
+5. Do NOT anchor SL to swing highs or lows that are more than 1.5 times the ATR away — use ATR-based SL only.
 
 Multi-timeframe market data:
 {json.dumps(market_summary, indent=2)}
@@ -132,12 +132,19 @@ Respond in JSON only. No markdown, no extra text.
         content = r.json()["choices"][0]["message"]["content"].strip()
 
         # Strip markdown fences if present
-        if content.startswith("```"):
+        if "```" in content:
             parts = content.split("```")
+            # grab the part inside the fences
             content = parts[1] if len(parts) > 1 else parts[0]
             if content.startswith("json"):
                 content = content[4:]
             content = content.strip()
+
+        # Extract JSON object if there is surrounding text
+        start = content.find("{")
+        end   = content.rfind("}")
+        if start != -1 and end != -1:
+            content = content[start:end+1]
 
         decision = json.loads(content)
         decision["symbol"] = symbol
