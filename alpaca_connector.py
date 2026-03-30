@@ -325,31 +325,56 @@ def place_order(symbol, direction, units, sl_price, tp_price):
         }
     # -------------------------------------------------------
 
-    order_body = {
+    # Alpaca does NOT support bracket orders for crypto — place legs separately.
+    url = f"{ALPACA_BASE_URL}/v2/orders"
+
+    # 1) Main market order
+    main_order = {
         "symbol":        symbol,
         "qty":           str(qty),
         "side":          side,
         "type":          "market",
         "time_in_force": "gtc",
-        "order_class":   "bracket",
-        "stop_loss": {
-            "stop_price": str(round(sl_price, 2))
-        },
-        "take_profit": {
-            "limit_price": str(round(tp_price, 2))
-        }
     }
-
-    url = f"{ALPACA_BASE_URL}/v2/orders"
-    r   = requests.post(url, headers=HEADERS, json=order_body, timeout=15)
-
+    r = requests.post(url, headers=HEADERS, json=main_order, timeout=15)
     if r.status_code not in [200, 201]:
         return {"success": False, "error": r.text}
 
-    data = r.json()
+    data     = r.json()
+    trade_id = data.get("id")
+
+    # 2) Take-profit limit order (opposite side, reduce-only)
+    exit_side = "sell" if side == "buy" else "buy"
+    tp_order = {
+        "symbol":        symbol,
+        "qty":           str(qty),
+        "side":          exit_side,
+        "type":          "limit",
+        "time_in_force": "gtc",
+        "limit_price":   str(round(tp_price, 2)),
+        "reduce_only":   True,
+    }
+    r_tp = requests.post(url, headers=HEADERS, json=tp_order, timeout=15)
+    if r_tp.status_code not in [200, 201]:
+        print(f"WARNING: TP order failed: {r_tp.text}", flush=True)
+
+    # 3) Stop-loss stop order (opposite side, reduce-only)
+    sl_order = {
+        "symbol":        symbol,
+        "qty":           str(qty),
+        "side":          exit_side,
+        "type":          "stop",
+        "time_in_force": "gtc",
+        "stop_price":    str(round(sl_price, 2)),
+        "reduce_only":   True,
+    }
+    r_sl = requests.post(url, headers=HEADERS, json=sl_order, timeout=15)
+    if r_sl.status_code not in [200, 201]:
+        print(f"WARNING: SL order failed: {r_sl.text}", flush=True)
+
     return {
         "success":   True,
-        "trade_id":  data.get("id"),
+        "trade_id":  trade_id,
         "price":     data.get("filled_avg_price") or "market",
         "units":     qty,
         "direction": direction,
